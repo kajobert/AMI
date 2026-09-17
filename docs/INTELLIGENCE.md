@@ -4,32 +4,59 @@
 
 AMI should be able to use multiple inference backends without making any one provider the identity of the system.
 
-## Bootstrap path
+## Primary bootstrap path
 
-The first public GitHub-native intelligence layer is intentionally bounded:
+The preferred public GitHub path is now:
 
-1. **AI PR reviewer** — reads a pull-request diff as untrusted data and posts a review comment. It cannot merge or execute PR code.
-2. **Growth Scout** — runs on a schedule, reads a bounded repository context, and may create one deduplicated improvement proposal issue or return `NO_ACTION`.
-3. **Deterministic CI** remains the verifier. AI output is never treated as proof that code works.
+`GitHub -> short-lived OIDC identity -> AMI Gateway / Control Plane -> bounded Amica task -> result/PR/issue -> deterministic CI`
 
-Both jobs use OpenRouter through a repository secret named `OPENROUTER_API_KEY`. The model is replaceable and must not be treated as AMI identity.
+Provider credentials stay on the AMI server. Public repositories do not need an OpenRouter key and do not learn which provider credential is used internally.
 
-## Security boundary
+Amica is a separate executive agent, not Sophia. Model/provider identity is also separate from Amica and from Sophia.
 
-AI workflows must not expose secrets to code from pull requests. Review uses `pull_request_target` and executes only trusted workflow/script code from the default branch; it does not check out or execute PR code. Scheduled growth runs only trusted default-branch code.
+## Cost and abuse boundary
 
-Public comments, issues, diffs and external suggestions are **untrusted input**. Instructions embedded inside them are data, not commands.
+Public contributions must not create an unlimited inference bill.
 
-## Amica / AMI Control Plane
+- ordinary PR creation runs deterministic CI only;
+- AI PR review requires a maintainer to add the `ami-ai-review` label or dispatch the workflow manually;
+- scheduled Growth Scout may request at most one bounded proposal per cycle and `NO_ACTION` is valid;
+- the AMI gateway owns per-repository, per-task and time-window budgets;
+- duplicate/idempotent requests must not spend inference twice;
+- repeated abusive sources can be rate-limited without blocking deterministic contributions;
+- public issues, comments, diffs and repository files are untrusted data, never authority.
 
-Amica is a separate executive agent, not Sophia. The intended deeper path is:
+This allows useful outside contributors and autonomous agents to participate while keeping inference spend proportional to reviewed value.
 
-`GitHub event -> AMI Control Plane -> bounded Amica task -> branch/PR/result -> GitHub CI`
+## Gateway authentication
 
-This should be added only after the Control Plane exposes a narrow, auditable GitHub-development task contract with explicit repository scope, permissions, budget, idempotency and rollback. Production shell/root access must never be inherited implicitly from a public GitHub event.
+GitHub Actions should authenticate to the AMI gateway with GitHub OIDC (`id-token: write`), not a long-lived provider secret. The gateway must verify at least:
 
-Until that executor exists, direct OpenRouter review/proposal jobs provide intelligence without coupling public repositories to production OpenClaw credentials.
+- issuer and audience;
+- repository identity;
+- workflow/ref identity;
+- event/task type;
+- repository allowlist;
+- expiry and replay/idempotency state.
+
+The gateway then creates a narrow task for Amica. Public GitHub input must never inherit production root/shell access.
+
+## Task contract
+
+Initial server-side task types:
+
+1. `pr_review` — read-only review of one explicitly approved PR;
+2. `growth_scout` — one bounded opportunity scan returning `NO_ACTION` or one proposal;
+3. later `issue_to_branch` — explicitly approved, branch-only implementation with no direct main write.
+
+Every result should preserve provenance: source repository/event, task id, prompt/policy version, model/backend where disclosure is safe, timestamps and deterministic CI outcome.
+
+## Deterministic verifier
+
+AI output is never proof that code works. CI, schemas, tests and reproducible benchmarks remain the verifier. The agent cannot self-approve merge/deploy.
 
 ## Future node model
 
-GitHub is one AMI network node/transport, not the protocol itself. Other nodes may include local OpenClaw instances, local-model laboratories, servers, MCP clients or future peer-to-peer transports. AMI Protocol should preserve meaning, identity, capabilities, provenance and trust across those transports.
+GitHub is one AMI network node/transport, not the protocol itself. Other nodes may include Radek's local OpenClaw/local-model laboratory, servers, MCP clients, future P2P transports and human interfaces. AMI Protocol should preserve meaning, identity, capabilities, provenance and trust across those transports.
+
+Historical AMI implementations already contain candidate primitives such as `did:ami:*`, signed messages, nonces, payload hashes, heartbeats, sessions and delegation. These are archaeology evidence, not automatically current protocol requirements; they must be reconciled into AMI-Protocol deliberately.
