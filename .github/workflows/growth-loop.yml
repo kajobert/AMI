@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
+  id-token: write
 
 concurrency:
   group: ami-growth-loop
@@ -16,37 +16,58 @@ concurrency:
 jobs:
   scout:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     env:
-      AMI_AI_MODEL: openai/gpt-5.6-luna
+      AMI_GATEWAY_URL: ${{ vars.AMI_GATEWAY_URL }}
     steps:
-      - name: Checkout trusted default branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Check OpenRouter configuration
-        id: openrouter
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      - name: Check AMI gateway configuration
+        id: gateway
         shell: bash
         run: |
-          if [ -z "$OPENROUTER_API_KEY" ]; then
+          if [ -z "$AMI_GATEWAY_URL" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "OPENROUTER_API_KEY is not configured; growth cycle skipped."
+            echo "AMI_GATEWAY_URL is not configured; growth cycle records NO_ACTION by configuration."
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run bounded growth scout
-        if: steps.openrouter.outputs.enabled == 'true'
+      - name: Request short-lived GitHub OIDC identity
+        if: steps.gateway.outputs.enabled == 'true'
+        id: oidc
+        shell: bash
+        run: |
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ami-control-plane")"
+          token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Submit bounded growth task to AMI gateway
+        if: steps.gateway.outputs.enabled == 'true'
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python .github/scripts/growth_scout.py
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          REQUESTED_BY: ${{ github.actor }}
+        shell: bash
+        run: |
+          payload="$(python - <<'PY'
+          import json, os
+          print(json.dumps({
+              "task": "growth_scout",
+              "repository": os.environ["REPOSITORY"],
+              "ref": os.environ["REF_NAME"],
+              "requested_by": os.environ["REQUESTED_BY"],
+              "max_proposals": 1,
+              "allow_code_write": False,
+          }))
+          PY
+          )"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "${AMI_GATEWAY_URL%/}/v1/github/tasks"
+
+# The server-side gateway owns provider credentials, budgets, idempotency and policy.
+# This workflow cannot merge, deploy or grant production shell access.
