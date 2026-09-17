@@ -1,0 +1,28 @@
+ecosystem: AMI
+name: Artificial Mind Full Intelligence
+status: DESIGN
+build_in_public: true
+modules:
+  - name: AMI
+    repository: kajobert/AMI
+    state: active
+    visibility: public
+  - name: AMI-Knowledge-Core
+    repository: kajobert/ami-knowledge-core
+    state: active
+    visibility: public
+    note: rename to AMI-Knowledge-Core when repository naming is normalized
+  - name: AMI-Kernel
+    repository: null
+    state: planned
+  - name: AMI-Protocol
+    repository: null
+    state: planned
+  - name: Sophia-AMI
+    repository: null
+    state: planned
+private_classes:
+  - raw-evidence
+  - personal-exports
+  - credentials
+  - sensitive-deployment-data
