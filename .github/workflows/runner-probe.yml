@@ -1,0 +1,22 @@
+name: Runner Provisioning Probe
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-hosted-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Prove runner allocation
+        run: |
+          echo "AMI_RUNNER_PROBE_OK"
+          uname -a
+          python --version || true
+
+# Diagnostic only. This intentionally avoids checkout and third-party actions so a
+# failure before the first step isolates GitHub runner provisioning from repo code.

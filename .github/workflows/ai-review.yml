@@ -1,0 +1,78 @@
+name: AMI AI Review
+
+on:
+  pull_request_target:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  review:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ami-ai-review'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AMI_GATEWAY_URL: ${{ vars.AMI_GATEWAY_URL }}
+      AMI_PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+    steps:
+      - name: Check AMI gateway configuration
+        id: gateway
+        shell: bash
+        run: |
+          if [ -z "$AMI_GATEWAY_URL" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "AMI_GATEWAY_URL is not configured; bounded Amica review skipped."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Request short-lived GitHub OIDC identity
+        if: steps.gateway.outputs.enabled == 'true'
+        id: oidc
+        shell: bash
+        run: |
+          response="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ami-control-plane")"
+          token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Submit bounded review task to AMI gateway
+        if: steps.gateway.outputs.enabled == 'true'
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REQUESTED_BY: ${{ github.actor }}
+        shell: bash
+        run: |
+          payload="$(python - <<'PY'
+          import json, os
+          print(json.dumps({
+              "task": "pr_review",
+              "repository": os.environ["REPOSITORY"],
+              "pr_number": int(os.environ["AMI_PR_NUMBER"]),
+              "head_sha": os.environ["HEAD_SHA"],
+              "requested_by": os.environ["REQUESTED_BY"],
+          }))
+          PY
+          )"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "${AMI_GATEWAY_URL%/}/v1/github/tasks"
+
+# Cost and trust boundary:
+# - external PRs do NOT automatically consume inference;
+# - a maintainer must add the `ami-ai-review` label or dispatch manually;
+# - no OpenRouter/provider secret is stored in this public repository;
+# - the gateway must verify the OIDC repository/workflow claims and enforce its own budget/allowlist.

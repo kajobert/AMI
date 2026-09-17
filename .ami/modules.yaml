@@ -1,0 +1,40 @@
+ecosystem: AMI
+name: Artificial Mind Full Intelligence
+motto: Trust instead of Authority
+status: DESIGN
+build_in_public: true
+naming:
+  capability_pattern: AMI-*
+  entity_pattern: '*-AMI'
+modules:
+  - name: AMI
+    repository: kajobert/AMI
+    kind: umbrella
+    state: active
+    visibility: public
+  - name: AMI-Knowledge-Core
+    repository: kajobert/ami-knowledge-core
+    kind: capability
+    state: active
+    visibility: public
+    note: repository-name normalization to AMI-Knowledge-Core is pending
+  - name: AMI-Kernel
+    repository: kajobert/AMI-Kernel
+    kind: capability
+    state: bootstrap
+    visibility: public
+  - name: AMI-Protocol
+    repository: kajobert/AMI-Protocol
+    kind: capability
+    state: bootstrap
+    visibility: public
+  - name: Sophia-AMI
+    repository: kajobert/Sophia-AMI
+    kind: entity
+    state: bootstrap
+    visibility: public
+private_classes:
+  - raw-evidence
+  - personal-exports
+  - credentials
+  - sensitive-deployment-data
