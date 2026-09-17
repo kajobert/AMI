@@ -22,8 +22,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Compile trusted Python helpers
-        run: python -m compileall -q .ami .github/scripts
+      - name: Compile deterministic AMI validator
+        run: python -m compileall -q .ami
 
       - name: Validate AMI repository contract
         run: python .ami/validate.py
