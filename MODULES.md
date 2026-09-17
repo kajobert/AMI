@@ -1,23 +1,29 @@
-# Module registry
+# AMI ecosystem registry
 
-This is the human-readable registry for public AMI modules. Machine-readable metadata lives in `.ami/modules.yaml`.
+This is the human-readable registry for the public AMI ecosystem. Machine-readable metadata lives in `.ami/modules.yaml`.
 
-## Active
+## Naming rule
 
-- `AMI` — umbrella repository and ecosystem registry.
-- `ami-knowledge-core` — current public repository for AMI Knowledge Core. Planned naming normalization: `AMI-Knowledge-Core`.
+- `AMI-*` = reusable capability / infrastructure / body layer.
+- `*-AMI` = persistent entity / identity / consciousness layer in AMI vocabulary.
 
-## Planned, not yet created
+## Active public repositories
 
-- `AMI-Kernel`
-- `AMI-Protocol`
-- `Sophia-AMI`
+- `AMI` — umbrella repository, public standard and ecosystem registry.
+- `AMI-Knowledge-Core` — provenance-first knowledge/evidence capability. The current repository is still named `ami-knowledge-core`; naming normalization is pending.
+- `AMI-Kernel` — runtime/orchestration capability; currently bootstrap-stage.
+- `AMI-Protocol` — transport-agnostic protocol capability; currently bootstrap-stage.
+- `Sophia-AMI` — entity repository; currently bootstrap-stage.
 
-## Not public by default
+## Private by default
 
 - raw archaeology/evidence repositories
 - personal chat/export archives
 - credentials and deployment secrets
 - historical repositories until sanitization review is complete
 
-A planned module becoming public does not imply that historical repositories with similar names are safe to publish.
+A public module never implies that a historical repository with a similar name is safe to publish.
+
+## Principle
+
+**Trust instead of Authority.** Participation and privileges should be based on verifiable contribution, provenance, tests and observed reliability rather than status alone.
