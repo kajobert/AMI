@@ -101,8 +101,12 @@ Implemented in code:
 - Evidence/Reality Matrix
 - worker/ingest status
 
-Not yet verified as a persistent deployed service:
-- private Tailscale-hosted preview on the project server.
+Verified deployed preview:
+- host: `sophia-core`
+- loopback service: `http://127.0.0.1:8765`
+- private tailnet URL: `https://sophia-core.tail6f4ebc.ts.net:8443/ami-encyclopedia`
+- health verified over Tailscale with HTTP 200
+- preview uses sanitized fixtures only; no private archaeology bodies are published.
 
 Target deployment boundary:
 
@@ -144,7 +148,7 @@ The exact governance, economics and protocol-level participation rules are still
 
 1. Repair/replace broken GitHub CI startup path.
 2. Review the stacked Knowledge Core PRs #6 -> #7 -> #9.
-3. Deploy a private Knowledge Core / Encyclopedia preview on the AMI node.
+3. ~~Deploy a private Knowledge Core / Encyclopedia preview on the AMI node.~~ **DONE**
 4. Ingest the first real archaeology batch privately.
 5. Connect Amica to the read-only Knowledge Core adapter.
 6. Run the first bounded Amica archaeology extraction/synthesis cycle.
