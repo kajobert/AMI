@@ -102,9 +102,9 @@ Implemented in code:
 - worker/ingest status
 
 Verified deployed preview:
-- host: `sophia-core`
+- host: private AMI reference node
 - loopback service: `http://127.0.0.1:8765`
-- private tailnet URL: `https://sophia-core.tail6f4ebc.ts.net:8443/ami-encyclopedia`
+- private tailnet URL: verified, intentionally not published
 - health verified over Tailscale with HTTP 200
 - preview uses sanitized fixtures only; no private archaeology bodies are published.
 
