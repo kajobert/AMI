@@ -47,6 +47,63 @@ Before opening a pull request:
 - preserve provenance and evidence boundaries;
 - do not silently change security or trust assumptions.
 
+## Contributor and agent onboarding
+
+AMI is designed for collaboration between multiple humans, tools, and operational agents.
+
+Human access and agent access are intentionally different:
+
+- human contributors use their own identities and credentials;
+- operational agents use narrower, task-scoped credentials;
+- agents do not inherit unrestricted human/admin authority;
+- secrets are never shared through prompts, issues, commits, logs, or documentation.
+
+The AMI Control Plane owns the canonical operational work lifecycle. Contributors and agents should not create parallel independent work queues.
+
+When peer-agent execution is available, the expected flow is:
+
+```text
+canonical AMI work item
+  -> bounded assignment to an approved backend/agent
+  -> isolated execution
+  -> normalized artifact + provenance + test result
+  -> Control Plane validation
+  -> review gate
+```
+
+Local inference backends are welcome where appropriate. A contributor may use local models for inventory, archaeology extraction, classification, synthesis, testing, or implementation experiments, provided the result is submitted with the same provenance and validation expectations as cloud-backed work.
+
+For archaeology work, prefer:
+
+```text
+immutable source inventory
+  -> selective extraction
+  -> provenance
+  -> reusable/superseded/unresolved classification
+  -> review before canonicalization
+```
+
+Historical material is evidence, not automatic current truth.
+
+## Evidence handoff expectations
+
+Implementation or archaeology handoffs should include, when applicable:
+
+- repository and base revision;
+- changed files or artifact references;
+- task purpose;
+- provenance/source references;
+- tests requested;
+- tests actually run;
+- pass/fail results;
+- known limitations or checks not run;
+- rollback notes;
+- model/backend identity where relevant;
+- cost/token/latency metadata when available;
+- final status.
+
+Do not include secret values.
+
 ## Public / private boundary
 
 Public repositories contain reusable AMI infrastructure.
