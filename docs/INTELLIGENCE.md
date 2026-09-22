@@ -20,9 +20,11 @@ Public contributions must not create an unlimited inference bill.
 
 - ordinary PR creation runs deterministic CI only;
 - AI PR review requires a maintainer to add the `ami-ai-review` label or dispatch the workflow manually;
-- scheduled Growth Scout may request at most one bounded proposal per cycle and `NO_ACTION` is valid;
-- the AMI gateway owns per-repository, per-task and time-window budgets;
-- duplicate/idempotent requests must not spend inference twice;
+- scheduled Growth Scout is explicitly default-off and requires a reviewed enable flag independent of gateway configuration; when enabled it may request at most one bounded proposal per cycle and `NO_ACTION` is valid;
+- the AMI gateway owns the authoritative server-side concurrency ceiling plus per-repository, per-task and time-window budgets;
+- capacity/cost is atomically reserved before paid inference; missing usage/cost is `UNKNOWN`, never zero;
+- durable semantic idempotency prevents parallel duplicates, restart/replay and ambiguous timeout retries from spending inference twice;
+- an independent server-side kill switch overrides all public workflow requests;
 - repeated abusive sources can be rate-limited without blocking deterministic contributions;
 - public issues, comments, diffs and repository files are untrusted data, never authority.
 
