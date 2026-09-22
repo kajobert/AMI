@@ -25,5 +25,8 @@ jobs:
       - name: Compile deterministic AMI validator
         run: python -m compileall -q .ami
 
+      - name: Run validator regression tests
+        run: python -m unittest discover -s .ami -p 'test_*.py'
+
       - name: Validate AMI repository contract
         run: python .ami/validate.py
