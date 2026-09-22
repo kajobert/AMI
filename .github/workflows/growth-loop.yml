@@ -9,8 +9,10 @@ permissions:
   contents: read
   id-token: write
 
+# GitHub concurrency is only a first boundary. The AMI server remains
+# authoritative for concurrency, budget, idempotency and the kill switch.
 concurrency:
-  group: ami-growth-loop
+  group: ami-growth-loop-${{ github.repository_id }}
   cancel-in-progress: false
 
 jobs:
@@ -18,36 +20,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      AMI_GROWTH_INGRESS_ENABLED: ${{ vars.AMI_GROWTH_INGRESS_ENABLED }}
       AMI_GATEWAY_URL: ${{ vars.AMI_GATEWAY_URL }}
+      AMI_GROWTH_POLICY_VERSION: ${{ vars.AMI_GROWTH_POLICY_VERSION }}
     steps:
-      - name: Check AMI gateway configuration
-        id: gateway
+      - name: Fail-closed growth preflight
+        id: growth
         shell: bash
         run: |
-          if [ -z "$AMI_GATEWAY_URL" ]; then
+          # Exact reviewed opt-in only. Missing, false, or malformed values never
+          # authorize inference, even when AMI_GATEWAY_URL is configured.
+          if [ "$AMI_GROWTH_INGRESS_ENABLED" != "true" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "AMI_GATEWAY_URL is not configured; growth cycle records NO_ACTION by configuration."
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Growth ingress is disabled by explicit default-off policy."
+            exit 0
           fi
 
+          if [ -z "$AMI_GATEWAY_URL" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Growth ingress requested but AMI_GATEWAY_URL is missing; fail closed."
+            exit 0
+          fi
+
+          if ! [[ "$AMI_GROWTH_POLICY_VERSION" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Growth ingress requested but AMI_GROWTH_POLICY_VERSION is missing or invalid; fail closed."
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
       - name: Request short-lived GitHub OIDC identity
-        if: steps.gateway.outputs.enabled == 'true'
+        if: steps.growth.outputs.enabled == 'true'
         id: oidc
         shell: bash
         run: |
           response="$(curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 --retry 0 \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ami-control-plane")"
           token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
       - name: Submit bounded growth task to AMI gateway
-        if: steps.gateway.outputs.enabled == 'true'
+        if: steps.growth.outputs.enabled == 'true'
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
           REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           REF_NAME: ${{ github.ref_name }}
+          INPUT_SHA: ${{ github.sha }}
+          POLICY_VERSION: ${{ vars.AMI_GROWTH_POLICY_VERSION }}
           REQUESTED_BY: ${{ github.actor }}
         shell: bash
         run: |
@@ -56,18 +79,31 @@ jobs:
           print(json.dumps({
               "task": "growth_scout",
               "repository": os.environ["REPOSITORY"],
+              "repository_id": os.environ["REPOSITORY_ID"],
               "ref": os.environ["REF_NAME"],
+              "input_sha": os.environ["INPUT_SHA"],
+              "policy_version": os.environ["POLICY_VERSION"],
               "requested_by": os.environ["REQUESTED_BY"],
               "max_proposals": 1,
               "allow_code_write": False,
           }))
           PY
           )"
+
+          # No blind retries: an ambiguous timeout may already have consumed paid
+          # inference. Durable server-side idempotency must resolve any later retry.
           curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 60 --retry 0 \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H "Content-Type: application/json" \
             --data "$payload" \
             "${AMI_GATEWAY_URL%/}/v1/github/tasks"
 
-# The server-side gateway owns provider credentials, budgets, idempotency and policy.
-# This workflow cannot merge, deploy or grant production shell access.
+# Server-side invariants remain authoritative and independent of this workflow:
+# - hard kill switch, default deny
+# - explicit concurrency ceiling
+# - atomic budget reservation before paid inference
+# - UNKNOWN cost/usage never treated as zero
+# - durable idempotency keyed by repository identity + task kind + immutable
+#   input SHA + policy version (plus request-content hash)
+# - no merge/deploy/shell/private-context privilege expansion
