@@ -60,23 +60,11 @@ for path in ROOT.rglob("*"):
         if pattern.search(text):
             errors.append(f"possible committed secret ({label}) in {path.relative_to(ROOT)}")
 
-if errors:
-    print("AMI repository contract: FAIL")
-    for error in errors:
-        print(f"- {error}")
-    sys.exit(1)
-
-print("AMI repository contract: PASS")
-print(f"checked_required_files={len(REQUIRED)}")
-print("public_secret_scan=PASS")
-print("motto=Trust instead of Authority")
-
-
 # Growth ingress contract: deterministic regression guard for the public workflow.
 growth_path = ROOT / ".github/workflows/growth-loop.yml"
 growth = growth_path.read_text(encoding="utf-8") if growth_path.is_file() else ""
 growth_requirements = {
-    "explicit default-off gate": 'AMI_GROWTH_INGRESS_ENABLED',
+    "explicit default-off gate": "AMI_GROWTH_INGRESS_ENABLED",
     "exact opt-in comparison": '[ "$AMI_GROWTH_INGRESS_ENABLED" != "true" ]',
     "policy version gate": "AMI_GROWTH_POLICY_VERSION",
     "repository identity": '"repository_id": os.environ["REPOSITORY_ID"]',
@@ -89,8 +77,20 @@ for label, needle in growth_requirements.items():
     if needle not in growth:
         errors.append(f"growth workflow missing {label}")
 
-if 'steps.gateway.outputs.enabled' in growth:
+if "steps.gateway.outputs.enabled" in growth:
     errors.append("growth workflow must not use gateway presence as the enable gate")
 
 if growth.count("--retry 0") < 2:
     errors.append("growth workflow must disable blind retries for OIDC and task submission")
+
+if errors:
+    print("AMI repository contract: FAIL")
+    for error in errors:
+        print(f"- {error}")
+    sys.exit(1)
+
+print("AMI repository contract: PASS")
+print(f"checked_required_files={len(REQUIRED)}")
+print("public_secret_scan=PASS")
+print("growth_ingress_contract=PASS")
+print("motto=Trust instead of Authority")
