@@ -20,6 +20,8 @@ REQUIRED = [
     "docs/SALT.md",
     "docs/LICENSING.md",
     "docs/INTELLIGENCE.md",
+    "docs/AMICA_GROWTH_ACCEPTANCE.md",
+    ".github/workflows/growth-loop.yml",
     ".ami/modules.yaml",
 ]
 
@@ -68,3 +70,27 @@ print("AMI repository contract: PASS")
 print(f"checked_required_files={len(REQUIRED)}")
 print("public_secret_scan=PASS")
 print("motto=Trust instead of Authority")
+
+
+# Growth ingress contract: deterministic regression guard for the public workflow.
+growth_path = ROOT / ".github/workflows/growth-loop.yml"
+growth = growth_path.read_text(encoding="utf-8") if growth_path.is_file() else ""
+growth_requirements = {
+    "explicit default-off gate": 'AMI_GROWTH_INGRESS_ENABLED',
+    "exact opt-in comparison": '[ "$AMI_GROWTH_INGRESS_ENABLED" != "true" ]',
+    "policy version gate": "AMI_GROWTH_POLICY_VERSION",
+    "repository identity": '"repository_id": os.environ["REPOSITORY_ID"]',
+    "immutable input SHA": '"input_sha": os.environ["INPUT_SHA"]',
+    "policy version in request": '"policy_version": os.environ["POLICY_VERSION"]',
+    "GitHub concurrency boundary": "concurrency:",
+    "no blind HTTP retry": "--retry 0",
+}
+for label, needle in growth_requirements.items():
+    if needle not in growth:
+        errors.append(f"growth workflow missing {label}")
+
+if 'steps.gateway.outputs.enabled' in growth:
+    errors.append("growth workflow must not use gateway presence as the enable gate")
+
+if growth.count("--retry 0") < 2:
+    errors.append("growth workflow must disable blind retries for OIDC and task submission")
